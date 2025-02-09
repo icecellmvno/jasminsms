@@ -335,7 +335,20 @@ class SMPPClientProtocol(twistedSMPPClientProtocol):
 
                 return txn
             else:
+                # This is a single PDU (not part of a long message)
                 self.preSubmitSm(pdu)
+                pdu.seqNum = self.claimSeqNum()
+                self.sendPDU(pdu)
+                
+                # Start a transaction and return its deferred
+                txn = self.startOutboundTransaction(pdu, timeout)
+                
+                # Add callback to wrap response in SMPPOutboundTxnResult
+                def wrapInResult(response):
+                    return SMPPOutboundTxnResult(self, pdu, response)
+                
+                txn.addCallback(wrapInResult)
+                return txn
 
         return twistedSMPPClientProtocol.doSendRequest(self, pdu, timeout)
 
